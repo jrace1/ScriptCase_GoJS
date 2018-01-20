@@ -1,1 +1,3 @@
-Para testar o acesso, crie uma nova aplicação blank, utilize o código de exemplo contido no arquivo blank como referência.
+﻿1) Importe como biblioteca externa.
+2) Para testar o acesso, crie uma nova aplicação blank, utilize o código de exemplo contido no arquivo TreeViewBlank.txt como referência.
+3) Colabore com melhorias.
