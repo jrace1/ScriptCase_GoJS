@@ -1,0 +1,160 @@
+// Dados do banco de dados para criação do Treeview
+$var_nodes_array = '{ 
+        "class": "go.TreeModel",
+        "nodeDataArray": [ ';
+
+    $check_sql = "SELECT iditens, itens_iditens, item, codigo FROM condominio.itens ";
+    sc_lookup(rs, $check_sql);
+
+    $counter = count({rs});
+    for($i=0;$i<$counter;$i++){ 
+//		if ( substr({rs[$i][4]}, 0, 7) == 'grp__NM'){ 
+//			$urlimg =  "../_lib/img/".{rs[$i][4]}; // Just for the purpose of example. Gets the project directory path
+//		}else{
+//			$urlimg = "../../../file/img/" .{rs[$i][4]}; // Image upload. It gets from the images directory path
+//		}
+		// End of URL management
+        $var_nodes_array .= ' {"key":'.{rs[$i][0]}.', "name":"'.{rs[$i][2]}.'"'; 
+        if(!empty({rs[$i][1]}) ){
+            $var_nodes_array .=  ', "parent":'.{rs[$i][1]}.'}';
+        }else{
+            $var_nodes_array .=  '}';
+        }
+        if ($i != ($counter-1) ){ $var_nodes_array .= ', '; }
+    }
+
+    $var_nodes_array .= ' ] 
+    }';
+
+
+// ---------------------------------------------------------
+
+function check_diff_multi($array1, $array2){
+    $result = array();
+
+    foreach($array1 as $key => $val) { 	
+		if($key == 'key') { $nodeid = $val; }
+        if(is_array($val) && isset($array2[$key])) {
+            $tmp = check_diff_multi($val, $array2[$key]);
+            if($tmp) {
+                $result[$key] = $tmp;
+            }
+        }
+        elseif(!isset($array2[$key])) {
+            $result[$key] = null;
+        }
+        elseif($val !== $array2[$key]) {
+			$result['key'] = $nodeid;
+            $result[$key] = $array2[$key];
+        }
+
+        if(isset($array2[$key])) {
+            unset($array2[$key]);
+        }
+    }
+
+    $result = array_merge($result, $array2);
+
+    return $result;
+}
+
+// ATUALIZANDO NÓS
+if( $_POST['ajaxtp'] == 'save' ){
+	
+	$a1 = json_decode($_POST['arraynodes_old'], true); 
+	$a2 = json_decode($_POST['arraynodes_new'], true); 
+
+	$result = check_diff_multi($a1, $a2);
+
+	foreach($result["nodeDataArray"] as $line => $val) { 
+		$var_sql_upd = "UPDATE itens SET ";
+		foreach($val as $field => $value){
+			//echo $field." => " .$value."<br/>";
+			switch($field){
+				case "name": 
+					echo "entrou name";
+					$var_sql_upd .= " item = '".$value."', ";
+					break;
+/**				case "title": 
+					$var_sql_upd .= " employee_title = '".$value."', ";
+					break;
+				case "photo": 
+					$var_sql_upd .= " employee_photo = '".$value."', ";
+					break;
+				case "parent": 
+					$var_sql_upd .= " employee_boss = ".$value.", ";
+					break;
+**/			}
+		}
+		$var_sql_upd = substr($var_sql_upd, 0, -2);
+		$var_sql_upd .= " WHERE iditens = ". $result["nodeDataArray"][$line]["key"];
+		echo $var_sql_upd;
+		sc_exec_sql( $var_sql_upd );
+	}
+
+}
+//INSERINDO UM NÓ
+elseif( $_POST['ajaxtp'] == 'insert' ){ 
+	if( $_POST['empboss'] == 0 ) { //Checa se trata-se de nó sem pai, o primeiro nivel do Treeview
+		// Nó de primeiro nível no treeview, sem no pai
+		$sql_insert = "INSERT INTO itens(itens_iditens, item, codigo, nivel) VALUES ('NULL', '(new person)', '1', '1')";
+	}else{
+		// Nó que já tem nó pai definido
+		$sql_insert = "INSERT INTO itens(itens_iditens, item, codigo, nivel) VALUES (".$_POST['empboss'].",'(new person)', '1', '1')";
+	}
+	sc_exec_sql($sql_insert);
+			
+	sc_lookup(rs,"SELECT iditens FROM itens ORDER BY iditens DESC LIMIT 1");
+	$result = {rs[0][0]};
+	echo $result;
+}
+//DELETANDO UM NÓ
+elseif( $_POST['ajaxtp'] == 'delete' ){ 
+	$sql_delete = "DELETE FROM itens WHERE iditens = ".$_POST['empkey'];
+	sc_exec_sql($sql_delete);
+}
+
+// ---------------------------------------------------------
+
+?>
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>GoJS Tree View</title>
+		<meta name="description" content="A traditional tree view using TreeLayout and orthogonal links." />
+		<!-- Copyright 1998-2017 by Northwoods Software Corporation. -->
+		<meta charset="UTF-8">
+
+		// Estas macros sc_include_lib são usadas para selecionar dinamicamente as bibliotecas da aplicação.
+		sc_include_lib("gojs"); //Desenha o treeview
+		sc_include_lib("Jquery"); //Insere jquery para transferência do array para o script go.js, dentre outras...
+		sc_include_lib("jquery_thickbox"); // Insere thickbox para gerar menu flutuante
+
+		// Chamando o javascript pela biblioteca externa
+		<script type="text/javascript" src="<?php echo sc_url_library('sys', 'gojs_sc', 'treeview\treeview.js'); ?>"></script>
+		
+		// Chamando o css através de biblioteca externa
+	//	<link rel="stylesheet" type="text/css" href="<?php echo sc_url_library('prj', 'gojs_sample', 'OrgChart.css'); ?>" />
+
+		<script>
+		$(document).ready(function() {
+			drawChart('myDiagramDiv', 'treeview_itens', 'treeview_itens');
+//			drawThemeButtons();
+		});
+		</script>		
+	</head>
+	<body>
+		<div id="sample">
+			//Parâmetros mínimos da DIV que receberá o treeview
+			<div id="myDiagramDiv" style="border: 1px solid black; width: 300px; height: 500px"></div>
+		</div>
+		
+	    <form id="savenodes" method="post" action="#">
+			//Array com dados para montagem de treeview
+			<input id="arraynodes_old" name="arraynodes_old" type="hidden" value='<?php echo $var_nodes_array; ?>' />
+        	<input id="arraynodes_new" name="arraynodes_new" type="hidden" value="" />
+    	</form>
+	</body>
+</html>
+<?php
