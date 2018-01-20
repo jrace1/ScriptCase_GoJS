@@ -1,0 +1,1 @@
+Para testar o acesso, crie uma nova aplicação blank, utilize o código de exemplo contido no arquivo blank como referência.
